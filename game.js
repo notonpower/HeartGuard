@@ -38,17 +38,17 @@ function drawUI() {
     if (uiLayout === 'horizontal') {
         ctx.fillRect(0, 0, gameLeft, window.innerHeight);
         ctx.fillRect(window.innerWidth - gameLeft, 0, gameLeft, window.innerHeight);
-        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 30, 20, '#ffffff', ctx);
-        drawLifeBar(10, 60, gameLeft - 20, 20);
-        drawPixelText(`SCORE: ${score}`, 10, 90, 20, '#ffffff', ctx);
-        drawPixelText(`AMMO: ${ammo}`, 10, 120, 20, '#ffffff', ctx);
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, gameTop + 30, 20, '#ffffff', ctx);
+        drawLifeBar(10, gameTop + 60, gameLeft - 20, 20);
+        drawPixelText(`SCORE: ${score}`, 10, gameTop + 90, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, 10, gameTop + 120, 20, '#ffffff', ctx);
     } else {
         ctx.fillRect(0, 0, window.innerWidth, gameTop);
         ctx.fillRect(0, window.innerHeight - gameTop, window.innerWidth, gameTop);
-        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 30, 20, '#ffffff', ctx);
-        drawLifeBar(10, window.innerHeight - gameTop + 10, gameWidth - 20, 20);
-        drawPixelText(`SCORE: ${score}`, 10, window.innerHeight - gameTop + 40, 20, '#ffffff', ctx);
-        drawPixelText(`AMMO: ${ammo}`, gameWidth - 150, window.innerHeight - gameTop + 40, 20, '#ffffff', ctx);
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, gameTop / 2 - 30, 20, '#ffffff', ctx);
+        drawLifeBar(10, gameTop / 2, gameWidth - 20, 20);
+        drawPixelText(`SCORE: ${score}`, 10, window.innerHeight - gameTop / 2 - 10, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, gameWidth - 150, window.innerHeight - gameTop / 2 - 10, 20, '#ffffff', ctx);
     }
 
     ctx.restore();
@@ -397,7 +397,7 @@ function createBullet(x, y) {
         y: gameHeight / 2,
         targetX: x - gameLeft,
         targetY: y - gameTop,
-        speed: 10,
+        speed: 20, // 弾の速度を2倍に増加
         size: 5
     };
 }
@@ -410,18 +410,19 @@ function updateBullets(deltaTime) {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < bullet.speed) {
-            bullets.splice(i, 1);
-            continue;
+            bullet.x = bullet.targetX;
+            bullet.y = bullet.targetY;
+        } else {
+            bullet.x += (dx / distance) * bullet.speed;
+            bullet.y += (dy / distance) * bullet.speed;
         }
-
-        bullet.x += (dx / distance) * bullet.speed;
-        bullet.y += (dy / distance) * bullet.speed;
 
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
         ctx.fill();
 
+        // 敵との衝突判定
         for (let j = enemies.length - 1; j >= 0; j--) {
             const enemy = enemies[j];
             const edx = enemy.x - bullet.x;
@@ -432,16 +433,20 @@ function updateBullets(deltaTime) {
                 enemies.splice(j, 1);
                 bullets.splice(i, 1);
                 score += 10;
-                createScoreEffect(enemy.x, enemy.y, 10);
+createScoreEffect(enemy.x, enemy.y, 10);
                 for (let k = 0; k < 20; k++) {
                     particles.push(createParticle(enemy.x, enemy.y, enemy.color));
                 }
                 break;
             }
         }
+
+        // 画面外に出た弾を削除
+        if (bullet.x < 0 || bullet.x > gameWidth || bullet.y < 0 || bullet.y > gameHeight) {
+            bullets.splice(i, 1);
+        }
     }
 }
-
 
 canvas.addEventListener('click', (event) => {
     if (!gameActive) return;
