@@ -1,7 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-let gameWidth, gameHeight, gameLeft, gameTop;
+let gameWidth, gameHeight;
 
 function resizeGame() {
     const aspectRatio = 4 / 3;
@@ -16,11 +16,8 @@ function resizeGame() {
         gameHeight = gameWidth / aspectRatio;
     }
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    gameLeft = (window.innerWidth - gameWidth) / 2;
-    gameTop = (window.innerHeight - gameHeight) / 2;
+    canvas.width = gameWidth;
+    canvas.height = gameHeight;
 
     updateUILayout();
 }
@@ -34,21 +31,18 @@ function updateUILayout() {
 function drawUI() {
     ctx.save();
     ctx.fillStyle = '#333';
-    
+    ctx.fillRect(0, 0, gameWidth, 50);
+
     if (uiLayout === 'horizontal') {
-        ctx.fillRect(0, 0, gameLeft, window.innerHeight);
-        ctx.fillRect(window.innerWidth - gameLeft, 0, gameLeft, window.innerHeight);
-        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 30, 20, '#ffffff', ctx);
-        drawLifeBar(10, 60, gameLeft - 20, 20);
-        drawPixelText(`SCORE: ${score}`, 10, 90, 20, '#ffffff', ctx);
-        drawPixelText(`AMMO: ${ammo}`, 10, 120, 20, '#ffffff', ctx);
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
+        drawLifeBar(gameWidth / 2 - 100, 15, 200, 20);
+        drawPixelText(`SCORE: ${score}`, gameWidth - 150, 15, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, 10, 40, 20, '#ffffff', ctx);
     } else {
-        ctx.fillRect(0, 0, window.innerWidth, gameTop);
-        ctx.fillRect(0, window.innerHeight - gameTop, window.innerWidth, gameTop);
-        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 30, 20, '#ffffff', ctx);
-        drawLifeBar(10, window.innerHeight - gameTop + 10, gameWidth - 20, 20);
-        drawPixelText(`SCORE: ${score}`, 10, window.innerHeight - gameTop + 40, 20, '#ffffff', ctx);
-        drawPixelText(`AMMO: ${ammo}`, gameWidth - 150, window.innerHeight - gameTop + 40, 20, '#ffffff', ctx);
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
+        drawLifeBar(10, 40, gameWidth - 20, 20);
+        drawPixelText(`SCORE: ${score}`, 10, 65, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, gameWidth - 100, 15, 20, '#ffffff', ctx);
     }
 
     ctx.restore();
@@ -64,7 +58,7 @@ let bullets = [];
 let gameActive = false;
 let heartLife = 100;
 let difficulty = 1;
-let ammo = 30;
+let ammo = 10;
 let reloadTime = 0;
 
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
@@ -289,13 +283,7 @@ function gameLoop(currentTime) {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.save();
-        ctx.translate(gameLeft, gameTop);
-        ctx.beginPath();
-        ctx.rect(0, 0, gameWidth, gameHeight);
-        ctx.clip();
-
-        drawPixelHeart(gameWidth / 2 - 32, gameHeight / 2 - 32, 64);
+        drawPixelHeart(canvas.width / 2 - 32, canvas.height / 2 - 32, 64);
 
         elapsedTime += deltaTime;
         difficulty = 1 + elapsedTime / 60;
@@ -309,14 +297,12 @@ function gameLoop(currentTime) {
         updateScoreEffects(deltaTime);
         updateBullets(deltaTime);
 
-        ctx.restore();
-
         drawUI();
 
         if (reloadTime > 0) {
             reloadTime -= deltaTime;
             if (reloadTime <= 0) {
-                ammo = 30;
+                ammo = 10;
             }
         }
 
@@ -326,7 +312,6 @@ function gameLoop(currentTime) {
         gameActive = false;
     }
 }
-
 
 const titleCanvas = document.getElementById('titleCanvas');
 const titleCtx = titleCanvas.getContext('2d');
@@ -395,8 +380,8 @@ function createBullet(x, y) {
     return {
         x: gameWidth / 2,
         y: gameHeight / 2,
-        targetX: x - gameLeft,
-        targetY: y - gameTop,
+        targetX: x,
+        targetY: y,
         speed: 10,
         size: 5
     };
@@ -442,13 +427,13 @@ function updateBullets(deltaTime) {
     }
 }
 
-
 canvas.addEventListener('click', (event) => {
     if (!gameActive) return;
 
     if (ammo > 0) {
-        const x = event.clientX;
-        const y = event.clientY;
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
 
         bullets.push(createBullet(x, y));
         ammo--;
