@@ -1,8 +1,56 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = 800;
-canvas.height = 600;
+let gameWidth, gameHeight;
+
+function resizeGame() {
+    const aspectRatio = 4 / 3;
+    const maxWidth = window.innerWidth * 0.8;
+    const maxHeight = window.innerHeight * 0.8;
+
+    if (maxWidth / aspectRatio > maxHeight) {
+        gameHeight = maxHeight;
+        gameWidth = gameHeight * aspectRatio;
+    } else {
+        gameWidth = maxWidth;
+        gameHeight = gameWidth / aspectRatio;
+    }
+
+    canvas.width = gameWidth;
+    canvas.height = gameHeight;
+
+    // UI要素の位置を更新
+    updateUILayout();
+}
+let uiLayout = 'horizontal';
+
+function updateUILayout() {
+    if (window.innerWidth > window.innerHeight) {
+        uiLayout = 'horizontal';
+    } else {
+        uiLayout = 'vertical';
+    }
+}
+
+function drawUI() {
+    ctx.save();
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 0, gameWidth, 50);
+
+    if (uiLayout === 'horizontal') {
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
+        drawLifeBar(gameWidth / 2 - 100, 15, 200, 20);
+        drawPixelText(`SCORE: ${score}`, gameWidth - 150, 15, 20, '#ffffff', ctx);
+    } else {
+        drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
+        drawLifeBar(10, 40, gameWidth - 20, 20);
+        drawPixelText(`SCORE: ${score}`, 10, 65, 20, '#ffffff', ctx);
+    }
+
+    ctx.restore();
+}
+
+window.addEventListener('resize', resizeGame);
 
 let score = 0;
 let elapsedTime = 0;
@@ -322,44 +370,68 @@ function updateScoreEffects(deltaTime) {
     }
 }
 
-canvas.addEventListener('click', (event) => {
-    if (!gameActive) {
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        // "PLAY AGAIN" テキストの位置とサイズ
-        const playAgainX = canvas.width / 2 - 80;
-        const playAgainY = 350;
-        const playAgainWidth = 160;
-        const playAgainHeight = 20;
-        
-        if (x >= playAgainX && x <= playAgainX + playAgainWidth &&
-            y >= playAgainY && y <= playAgainY + playAgainHeight) {
-            startGame();
+let bullets = [];
+
+function createBullet(x, y) {
+    return {
+        x: gameWidth / 2,
+        y: gameHeight / 2,
+        targetX: x,
+        targetY: y,
+        speed: 10,
+        size: 5
+    };
+}
+
+function updateBullets(deltaTime) {
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        const dx = bullet.targetX - bullet.x;
+        const dy = bullet.targetY - bullet.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < bullet.speed) {
+            bullets.splice(i, 1);
+            continue;
         }
-        return;
+
+        bullet.x += (dx / distance) * bullet.speed;
+        bullet.y += (dy / distance) * bullet.speed;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 敵との衝突判定
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const enemy = enemies[j];
+            const edx = enemy.x - bullet.x;
+            const edy = enemy.y - bullet.y;
+            const enemyDistance = Math.sqrt(edx * edx + edy * edy);
+
+            if (enemyDistance < enemy.size + bullet.size) {
+                enemies.splice(j, 1);
+                bullets.splice(i, 1);
+                score += 10;
+                createScoreEffect(enemy.x, enemy.y, 10);
+                for (let k = 0; k < 20; k++) {
+                    particles.push(createParticle(enemy.x, enemy.y, enemy.color));
+                }
+                break;
+            }
+        }
     }
+}
+
+canvas.addEventListener('click', (event) => {
+    if (!gameActive) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-        if (!enemy) continue;
-        const dx = x - enemy.x;
-        const dy = y - enemy.y;
-        if (Math.sqrt(dx * dx + dy * dy) < enemy.size) {
-            enemies.splice(i, 1);
-            score += 10;
-            createScoreEffect(enemy.x, enemy.y, 10);
-            for (let j = 0; j < 20; j++) {
-                particles.push(createParticle(enemy.x, enemy.y, enemy.color));
-            }
-            break;
-        }
-    }
+    bullets.push(createBullet(x, y));
 });
 
 function showResult() {
