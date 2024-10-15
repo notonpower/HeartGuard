@@ -19,17 +19,13 @@ function resizeGame() {
     canvas.width = gameWidth;
     canvas.height = gameHeight;
 
-    // UI要素の位置を更新
     updateUILayout();
 }
+
 let uiLayout = 'horizontal';
 
 function updateUILayout() {
-    if (window.innerWidth > window.innerHeight) {
-        uiLayout = 'horizontal';
-    } else {
-        uiLayout = 'vertical';
-    }
+    uiLayout = window.innerWidth > window.innerHeight ? 'horizontal' : 'vertical';
 }
 
 function drawUI() {
@@ -41,10 +37,12 @@ function drawUI() {
         drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
         drawLifeBar(gameWidth / 2 - 100, 15, 200, 20);
         drawPixelText(`SCORE: ${score}`, gameWidth - 150, 15, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, 10, 40, 20, '#ffffff', ctx);
     } else {
         drawPixelText(`TIME: ${formatTime(elapsedTime)}`, 10, 15, 20, '#ffffff', ctx);
         drawLifeBar(10, 40, gameWidth - 20, 20);
         drawPixelText(`SCORE: ${score}`, 10, 65, 20, '#ffffff', ctx);
+        drawPixelText(`AMMO: ${ammo}`, gameWidth - 100, 15, 20, '#ffffff', ctx);
     }
 
     ctx.restore();
@@ -56,9 +54,12 @@ let score = 0;
 let elapsedTime = 0;
 let enemies = [];
 let particles = [];
+let bullets = [];
 let gameActive = false;
 let heartLife = 100;
 let difficulty = 1;
+let ammo = 10;
+let reloadTime = 0;
 
 const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
 
@@ -67,7 +68,7 @@ function drawPixelText(text, x, y, size, color, context) {
         console.warn('Undefined or null text passed to drawPixelText');
         return;
     }
-    text = text.toString(); // 数値を文字列に変換
+    text = text.toString();
 
     const characters = {
         '0': [[1,1,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],
@@ -183,8 +184,6 @@ function drawPixelHeart(x, y, size) {
     }
 }
 
-
-
 function createEnemy() {
     const angle = Math.random() * Math.PI * 2;
     const distance = Math.max(canvas.width, canvas.height) / 2;
@@ -193,8 +192,8 @@ function createEnemy() {
         y: canvas.height / 2 + Math.sin(angle) * distance,
         size: 20,
         color: colors[Math.floor(Math.random() * colors.length)],
-        speedX: (Math.random() * 1 - 0.5) * difficulty, // 速度を遅くした
-        speedY: (Math.random() * 1 - 0.5) * difficulty  // 速度を遅くした
+        speedX: (Math.random() * 1 - 0.5) * difficulty,
+        speedY: (Math.random() * 1 - 0.5) * difficulty
     };
 }
 
@@ -238,7 +237,6 @@ function updateParticles(deltaTime) {
 let lifeBarShake = 0;
 let highScore = parseInt(localStorage.getItem('highScore')) || 0;
 
-// ライフバーの描画関数を修正
 function drawLifeBar() {
     const barWidth = 200;
     const barHeight = 20;
@@ -253,11 +251,11 @@ function drawLifeBar() {
 
     let barColor;
     if (heartLife > 66) {
-        barColor = '#00ff00'; // 緑
+        barColor = '#00ff00';
     } else if (heartLife > 33) {
-        barColor = '#ffff00'; // 黄色
+        barColor = '#ffff00';
     } else {
-        barColor = '#ff0000'; // 赤
+        barColor = '#ff0000';
     }
 
     ctx.fillStyle = barColor;
@@ -297,10 +295,16 @@ function gameLoop(currentTime) {
         updateEnemies(deltaTime);
         updateParticles(deltaTime);
         updateScoreEffects(deltaTime);
+        updateBullets(deltaTime);
 
-        drawPixelText(formatTime(elapsedTime), canvas.width / 2 - 50, 10, 20, '#ffffff', ctx);
-        drawPixelText(`SCORE:${score}`, canvas.width - 150, 10, 20, '#ffffff', ctx);
-        drawLifeBar();
+        drawUI();
+
+        if (reloadTime > 0) {
+            reloadTime -= deltaTime;
+            if (reloadTime <= 0) {
+                ammo = 10;
+            }
+        }
 
         gameLoopId = requestAnimationFrame(gameLoop);
     } catch (error) {
@@ -308,7 +312,6 @@ function gameLoop(currentTime) {
         gameActive = false;
     }
 }
-
 
 const titleCanvas = document.getElementById('titleCanvas');
 const titleCtx = titleCanvas.getContext('2d');
@@ -332,8 +335,11 @@ function resetGame() {
     elapsedTime = 0;
     enemies = [];
     particles = [];
+    bullets = [];
     heartLife = 100;
     difficulty = 1;
+    ammo = 10;
+    reloadTime = 0;
 }
 
 window.addEventListener('load', () => {
@@ -370,8 +376,6 @@ function updateScoreEffects(deltaTime) {
     }
 }
 
-let bullets = [];
-
 function createBullet(x, y) {
     return {
         x: gameWidth / 2,
@@ -403,7 +407,6 @@ function updateBullets(deltaTime) {
         ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
         ctx.fill();
 
-        // 敵との衝突判定
         for (let j = enemies.length - 1; j >= 0; j--) {
             const enemy = enemies[j];
             const edx = enemy.x - bullet.x;
@@ -427,11 +430,18 @@ function updateBullets(deltaTime) {
 canvas.addEventListener('click', (event) => {
     if (!gameActive) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    if (ammo > 0) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
 
-    bullets.push(createBullet(x, y));
+        bullets.push(createBullet(x, y));
+        ammo--;
+
+        if (ammo === 0) {
+            reloadTime = 2;
+        }
+    }
 });
 
 function showResult() {
@@ -464,7 +474,6 @@ function showResult() {
     resultScreen.innerHTML = '';
     resultScreen.appendChild(resultCanvas);
 
-    // Add click event listener to the result canvas
     resultCanvas.addEventListener('click', handleResultClick);
 }
 
@@ -473,7 +482,6 @@ function handleResultClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // "PLAY AGAIN" テキストの位置とサイズ
     const playAgainX = event.target.width / 2 - 80;
     const playAgainY = 350;
     const playAgainWidth = 160;
@@ -485,7 +493,6 @@ function handleResultClick(event) {
     }
 }
 
-
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('result-screen').style.display = 'none';
@@ -493,7 +500,7 @@ function startGame() {
     resetGame();
     gameActive = true;
     lastTime = undefined;
-    cancelAnimationFrame(gameLoopId);  // 既存のゲームループをキャンセル
+    cancelAnimationFrame(gameLoopId);
     gameLoopId = requestAnimationFrame(gameLoop);
     
     canvas.style.cursor = 'crosshair';
